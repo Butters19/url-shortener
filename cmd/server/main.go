@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/Butters19/url-shortener/internal/handler"
+	"github.com/Butters19/url-shortener/internal/service"
 	"github.com/Butters19/url-shortener/internal/storage"
 	"github.com/Butters19/url-shortener/internal/storage/memory"
 	"github.com/Butters19/url-shortener/internal/storage/postgres"
@@ -55,7 +56,8 @@ func main() {
 		log.Fatalf("unknown storage type: %s", *storageType)
 	}
 
-	h := handler.New(store)
+	svc := service.New(store)
+	h := handler.New(svc)
 
 	log.Printf("starting server on %s with %s storage", *addr, *storageType)
 	if err := http.ListenAndServe(*addr, h.Routes()); err != nil {

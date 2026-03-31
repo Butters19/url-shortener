@@ -5,19 +5,21 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/Butters19/url-shortener/internal/generator"
-	"github.com/Butters19/url-shortener/internal/storage"
+	"github.com/Butters19/url-shortener/internal/service"
 	"github.com/go-chi/chi/v5"
 )
 
-const maxRetries = 5
-
-type Handler struct {
-	storage storage.Storage
+type Service interface {
+	Shorten(originalURL string) (string, error)
+	Resolve(shortCode string) (string, error)
 }
 
-func New(storage storage.Storage) *Handler {
-	return &Handler{storage: storage}
+type Handler struct {
+	service Service
+}
+
+func New(svc Service) *Handler {
+	return &Handler{service: svc}
 }
 
 func (h *Handler) Routes() http.Handler {
@@ -27,7 +29,6 @@ func (h *Handler) Routes() http.Handler {
 	return r
 }
 
-// POST / — принимает {"url": "https://..."}, возвращает {"short_code": "..."}
 func (h *Handler) handleCreate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		URL string `json:"url"`
@@ -38,47 +39,20 @@ func (h *Handler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Если URL уже существует — возвращаем существующий код
-	existingCode, err := h.storage.GetByURL(req.URL)
-	if err == nil {
-		writeJSON(w, map[string]string{"short_code": existingCode}, http.StatusOK)
+	code, err := h.service.Shorten(req.URL)
+	if err != nil {
+		writeError(w, "failed to shorten url", http.StatusInternalServerError)
 		return
 	}
 
-	// Генерируем уникальный код с retry на случай коллизии
-	var shortCode string
-	for range maxRetries {
-		code, err := generator.Generate()
-		if err != nil {
-			writeError(w, "failed to generate code", http.StatusInternalServerError)
-			return
-		}
-
-		err = h.storage.Save(req.URL, code)
-		if err == nil {
-			shortCode = code
-			break
-		}
-		if !errors.Is(err, storage.ErrAlreadyExists) {
-			writeError(w, "failed to save url", http.StatusInternalServerError)
-			return
-		}
-	}
-
-	if shortCode == "" {
-		writeError(w, "failed to generate unique code", http.StatusInternalServerError)
-		return
-	}
-
-	writeJSON(w, map[string]string{"short_code": shortCode}, http.StatusCreated)
+	writeJSON(w, map[string]string{"short_code": code}, http.StatusCreated)
 }
 
-// GET /{code} — возвращает {"url": "https://..."}
 func (h *Handler) handleGet(w http.ResponseWriter, r *http.Request) {
 	code := chi.URLParam(r, "code")
 
-	originalURL, err := h.storage.GetByCode(code)
-	if errors.Is(err, storage.ErrNotFound) {
+	originalURL, err := h.service.Resolve(code)
+	if errors.Is(err, service.ErrNotFound) {
 		writeError(w, "url not found", http.StatusNotFound)
 		return
 	}
