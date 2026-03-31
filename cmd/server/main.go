@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"flag"
 	"log"
 	"net/http"
@@ -14,15 +15,8 @@ import (
 	"github.com/Butters19/url-shortener/internal/storage/postgres"
 )
 
-const migration = `
-CREATE TABLE IF NOT EXISTS urls (
-    id           BIGSERIAL PRIMARY KEY,
-    original_url TEXT        NOT NULL,
-    short_code   VARCHAR(10) NOT NULL,
-    created_at   TIMESTAMP   NOT NULL DEFAULT NOW(),
-    CONSTRAINT urls_original_url_unique UNIQUE (original_url),
-    CONSTRAINT urls_short_code_unique   UNIQUE (short_code)
-);`
+//go:embed migrations/001_unit.sql
+var migration string
 
 func main() {
 	storageType := flag.String("storage", "memory", "storage type: memory or postgres")

@@ -12,21 +12,21 @@ import (
 func TestSave_And_GetByCode(t *testing.T) {
 	s := memory.New()
 
-	err := s.Save("https://google.com", "abc123")
+	err := s.Save("https://ozon.ru", "abc123")
 	require.NoError(t, err)
 
 	url, err := s.GetByCode("abc123")
 	require.NoError(t, err)
-	assert.Equal(t, "https://google.com", url)
+	assert.Equal(t, "https://ozon.ru", url)
 }
 
 func TestSave_And_GetByURL(t *testing.T) {
 	s := memory.New()
 
-	err := s.Save("https://google.com", "abc123")
+	err := s.Save("https://ozon.ru", "abc123")
 	require.NoError(t, err)
 
-	code, err := s.GetByURL("https://google.com")
+	code, err := s.GetByURL("https://ozon.ru")
 	require.NoError(t, err)
 	assert.Equal(t, "abc123", code)
 }
@@ -34,10 +34,10 @@ func TestSave_And_GetByURL(t *testing.T) {
 func TestSave_DuplicateURL_ReturnsError(t *testing.T) {
 	s := memory.New()
 
-	err := s.Save("https://google.com", "abc123")
+	err := s.Save("https://ozon.ru", "abc123")
 	require.NoError(t, err)
 
-	err = s.Save("https://google.com", "xyz999")
+	err = s.Save("https://ozon.ru", "xyz999")
 	assert.ErrorIs(t, err, storage.ErrAlreadyExists)
 }
 
