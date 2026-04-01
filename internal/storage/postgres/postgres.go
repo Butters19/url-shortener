@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/Butters19/url-shortener/internal/model"
 	"github.com/Butters19/url-shortener/internal/storage"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -31,11 +32,14 @@ func (s *Storage) Close() {
 	s.pool.Close()
 }
 
-func (s *Storage) Save(originalURL, shortCode string) error {
-	_, err := s.pool.Exec(
-		context.Background(),
+func (s *Storage) Pool() *pgxpool.Pool {
+	return s.pool
+}
+
+func (s *Storage) Save(ctx context.Context, url model.URL) error {
+	_, err := s.pool.Exec(ctx,
 		`INSERT INTO urls (original_url, short_code) VALUES ($1, $2)`,
-		originalURL, shortCode,
+		url.Original, url.Code,
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -47,38 +51,32 @@ func (s *Storage) Save(originalURL, shortCode string) error {
 	return nil
 }
 
-func (s *Storage) GetByCode(shortCode string) (string, error) {
-	var originalURL string
-	err := s.pool.QueryRow(
-		context.Background(),
-		`SELECT original_url FROM urls WHERE short_code = $1`,
-		shortCode,
-	).Scan(&originalURL)
+func (s *Storage) GetByCode(ctx context.Context, code string) (*model.URL, error) {
+	var u model.URL
+	err := s.pool.QueryRow(ctx,
+		`SELECT id, original_url, short_code, created_at FROM urls WHERE short_code = $1`,
+		code,
+	).Scan(&u.ID, &u.Original, &u.Code, &u.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", storage.ErrNotFound
+		return nil, storage.ErrNotFound
 	}
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return originalURL, nil
+	return &u, nil
 }
 
-func (s *Storage) GetByURL(originalURL string) (string, error) {
-	var shortCode string
-	err := s.pool.QueryRow(
-		context.Background(),
-		`SELECT short_code FROM urls WHERE original_url = $1`,
-		originalURL,
-	).Scan(&shortCode)
+func (s *Storage) GetByOrigin(ctx context.Context, origin string) (*model.URL, error) {
+	var u model.URL
+	err := s.pool.QueryRow(ctx,
+		`SELECT id, original_url, short_code, created_at FROM urls WHERE original_url = $1`,
+		origin,
+	).Scan(&u.ID, &u.Original, &u.Code, &u.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", storage.ErrNotFound
+		return nil, storage.ErrNotFound
 	}
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return shortCode, nil
-}
-
-func (s *Storage) Pool() *pgxpool.Pool {
-	return s.pool
+	return &u, nil
 }

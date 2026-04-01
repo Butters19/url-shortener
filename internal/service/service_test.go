@@ -1,9 +1,11 @@
 package service_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 
+	"github.com/Butters19/url-shortener/internal/model"
 	"github.com/Butters19/url-shortener/internal/service"
 	"github.com/Butters19/url-shortener/internal/storage"
 	"github.com/stretchr/testify/assert"
@@ -11,46 +13,47 @@ import (
 )
 
 type mockStorage struct {
-	urlToCode map[string]string
-	codeToURL map[string]string
+	originToURL map[string]*model.URL
+	codeToURL   map[string]*model.URL
 }
 
 func newMockStorage() *mockStorage {
 	return &mockStorage{
-		urlToCode: make(map[string]string),
-		codeToURL: make(map[string]string),
+		originToURL: make(map[string]*model.URL),
+		codeToURL:   make(map[string]*model.URL),
 	}
 }
 
-func (m *mockStorage) Save(originalURL, shortCode string) error {
-	if _, exists := m.urlToCode[originalURL]; exists {
+func (m *mockStorage) Save(ctx context.Context, url model.URL) error {
+	if _, exists := m.originToURL[url.Original]; exists {
 		return storage.ErrAlreadyExists
 	}
-	m.urlToCode[originalURL] = shortCode
-	m.codeToURL[shortCode] = originalURL
+	u := &url
+	m.originToURL[url.Original] = u
+	m.codeToURL[url.Code] = u
 	return nil
 }
 
-func (m *mockStorage) GetByCode(shortCode string) (string, error) {
-	url, exists := m.codeToURL[shortCode]
+func (m *mockStorage) GetByCode(ctx context.Context, code string) (*model.URL, error) {
+	u, exists := m.codeToURL[code]
 	if !exists {
-		return "", storage.ErrNotFound
+		return nil, storage.ErrNotFound
 	}
-	return url, nil
+	return u, nil
 }
 
-func (m *mockStorage) GetByURL(originalURL string) (string, error) {
-	code, exists := m.urlToCode[originalURL]
+func (m *mockStorage) GetByOrigin(ctx context.Context, origin string) (*model.URL, error) {
+	u, exists := m.originToURL[origin]
 	if !exists {
-		return "", storage.ErrNotFound
+		return nil, storage.ErrNotFound
 	}
-	return code, nil
+	return u, nil
 }
 
 func TestShorten_ReturnsShortCode(t *testing.T) {
 	svc := service.New(newMockStorage())
 
-	code, err := svc.Shorten("https://ozon.ru")
+	code, err := svc.Shorten(context.Background(), "https://ozon.ru")
 	require.NoError(t, err)
 	assert.Len(t, code, 10)
 }
@@ -58,10 +61,10 @@ func TestShorten_ReturnsShortCode(t *testing.T) {
 func TestShorten_SameURL_ReturnsSameCode(t *testing.T) {
 	svc := service.New(newMockStorage())
 
-	code1, err := svc.Shorten("https://ozon.ru")
+	code1, err := svc.Shorten(context.Background(), "https://ozon.ru")
 	require.NoError(t, err)
 
-	code2, err := svc.Shorten("https://ozon.ru")
+	code2, err := svc.Shorten(context.Background(), "https://ozon.ru")
 	require.NoError(t, err)
 
 	assert.Equal(t, code1, code2)
@@ -70,10 +73,10 @@ func TestShorten_SameURL_ReturnsSameCode(t *testing.T) {
 func TestShorten_DifferentURLs_ReturnDifferentCodes(t *testing.T) {
 	svc := service.New(newMockStorage())
 
-	code1, err := svc.Shorten("https://ozon.ru")
+	code1, err := svc.Shorten(context.Background(), "https://ozon.ru")
 	require.NoError(t, err)
 
-	code2, err := svc.Shorten("https://github.com")
+	code2, err := svc.Shorten(context.Background(), "https://github.com")
 	require.NoError(t, err)
 
 	assert.NotEqual(t, code1, code2)
@@ -82,10 +85,10 @@ func TestShorten_DifferentURLs_ReturnDifferentCodes(t *testing.T) {
 func TestResolve_ReturnsOriginalURL(t *testing.T) {
 	svc := service.New(newMockStorage())
 
-	code, err := svc.Shorten("https://ozon.ru")
+	code, err := svc.Shorten(context.Background(), "https://ozon.ru")
 	require.NoError(t, err)
 
-	url, err := svc.Resolve(code)
+	url, err := svc.Resolve(context.Background(), code)
 	require.NoError(t, err)
 	assert.Equal(t, "https://ozon.ru", url)
 }
@@ -93,6 +96,6 @@ func TestResolve_ReturnsOriginalURL(t *testing.T) {
 func TestResolve_NotFound_ReturnsError(t *testing.T) {
 	svc := service.New(newMockStorage())
 
-	_, err := svc.Resolve("notexist")
+	_, err := svc.Resolve(context.Background(), "notexist")
 	assert.True(t, errors.Is(err, service.ErrNotFound))
 }

@@ -1,9 +1,12 @@
 package service
 
 import (
+	"context"
 	"errors"
+	"time"
 
 	"github.com/Butters19/url-shortener/internal/generator"
+	"github.com/Butters19/url-shortener/internal/model"
 	"github.com/Butters19/url-shortener/internal/storage"
 )
 
@@ -16,14 +19,14 @@ type Service struct {
 	storage storage.Storage
 }
 
-func New(storage storage.Storage) *Service {
-	return &Service{storage: storage}
+func New(s storage.Storage) *Service {
+	return &Service{storage: s}
 }
 
-func (s *Service) Shorten(originalURL string) (string, error) {
-	existingCode, err := s.storage.GetByURL(originalURL)
+func (s *Service) Shorten(ctx context.Context, originalURL string) (string, error) {
+	existing, err := s.storage.GetByOrigin(ctx, originalURL)
 	if err == nil {
-		return existingCode, nil
+		return existing.Code, nil
 	}
 
 	for range maxRetries {
@@ -32,7 +35,11 @@ func (s *Service) Shorten(originalURL string) (string, error) {
 			return "", ErrInternal
 		}
 
-		err = s.storage.Save(originalURL, code)
+		err = s.storage.Save(ctx, model.URL{
+			Original:  originalURL,
+			Code:      code,
+			CreatedAt: time.Now(),
+		})
 		if err == nil {
 			return code, nil
 		}
@@ -44,13 +51,13 @@ func (s *Service) Shorten(originalURL string) (string, error) {
 	return "", ErrInternal
 }
 
-func (s *Service) Resolve(shortCode string) (string, error) {
-	url, err := s.storage.GetByCode(shortCode)
+func (s *Service) Resolve(ctx context.Context, code string) (string, error) {
+	u, err := s.storage.GetByCode(ctx, code)
 	if errors.Is(err, storage.ErrNotFound) {
 		return "", ErrNotFound
 	}
 	if err != nil {
 		return "", ErrInternal
 	}
-	return url, nil
+	return u.Original, nil
 }

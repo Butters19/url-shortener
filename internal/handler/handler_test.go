@@ -2,6 +2,7 @@ package handler_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -13,23 +14,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// mockService — заглушка сервиса для тестов
 type mockService struct {
-	shortenFunc func(url string) (string, error)
-	resolveFunc func(code string) (string, error)
+	shortenFunc func(ctx context.Context, url string) (string, error)
+	resolveFunc func(ctx context.Context, code string) (string, error)
 }
 
-func (m *mockService) Shorten(url string) (string, error) {
-	return m.shortenFunc(url)
+func (m *mockService) Shorten(ctx context.Context, url string) (string, error) {
+	return m.shortenFunc(ctx, url)
 }
 
-func (m *mockService) Resolve(code string) (string, error) {
-	return m.resolveFunc(code)
+func (m *mockService) Resolve(ctx context.Context, code string) (string, error) {
+	return m.resolveFunc(ctx, code)
 }
 
 func TestHandleCreate_Success(t *testing.T) {
 	svc := &mockService{
-		shortenFunc: func(url string) (string, error) {
+		shortenFunc: func(ctx context.Context, url string) (string, error) {
 			return "abc123defg", nil
 		},
 	}
@@ -51,7 +51,7 @@ func TestHandleCreate_Success(t *testing.T) {
 
 func TestHandleCreate_EmptyURL_ReturnsBadRequest(t *testing.T) {
 	svc := &mockService{
-		shortenFunc: func(url string) (string, error) {
+		shortenFunc: func(ctx context.Context, url string) (string, error) {
 			return "", nil
 		},
 	}
@@ -69,7 +69,7 @@ func TestHandleCreate_EmptyURL_ReturnsBadRequest(t *testing.T) {
 
 func TestHandleCreate_InvalidBody_ReturnsBadRequest(t *testing.T) {
 	svc := &mockService{
-		shortenFunc: func(url string) (string, error) {
+		shortenFunc: func(ctx context.Context, url string) (string, error) {
 			return "", nil
 		},
 	}
@@ -87,7 +87,7 @@ func TestHandleCreate_InvalidBody_ReturnsBadRequest(t *testing.T) {
 
 func TestHandleGet_Success(t *testing.T) {
 	svc := &mockService{
-		resolveFunc: func(code string) (string, error) {
+		resolveFunc: func(ctx context.Context, code string) (string, error) {
 			return "https://ozon.ru", nil
 		},
 	}
@@ -107,7 +107,7 @@ func TestHandleGet_Success(t *testing.T) {
 
 func TestHandleGet_NotFound_Returns404(t *testing.T) {
 	svc := &mockService{
-		resolveFunc: func(code string) (string, error) {
+		resolveFunc: func(ctx context.Context, code string) (string, error) {
 			return "", service.ErrNotFound
 		},
 	}

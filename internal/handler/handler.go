@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -10,8 +11,8 @@ import (
 )
 
 type Service interface {
-	Shorten(originalURL string) (string, error)
-	Resolve(shortCode string) (string, error)
+	Shorten(ctx context.Context, originalURL string) (string, error)
+	Resolve(ctx context.Context, code string) (string, error)
 }
 
 type Handler struct {
@@ -39,7 +40,7 @@ func (h *Handler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	code, err := h.service.Shorten(req.URL)
+	code, err := h.service.Shorten(r.Context(), req.URL)
 	if err != nil {
 		writeError(w, "failed to shorten url", http.StatusInternalServerError)
 		return
@@ -51,7 +52,7 @@ func (h *Handler) handleCreate(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleGet(w http.ResponseWriter, r *http.Request) {
 	code := chi.URLParam(r, "code")
 
-	originalURL, err := h.service.Resolve(code)
+	originalURL, err := h.service.Resolve(r.Context(), code)
 	if errors.Is(err, service.ErrNotFound) {
 		writeError(w, "url not found", http.StatusNotFound)
 		return

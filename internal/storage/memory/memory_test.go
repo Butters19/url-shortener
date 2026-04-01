@@ -1,8 +1,10 @@
 package memory_test
 
 import (
+	"context"
 	"testing"
 
+	"github.com/Butters19/url-shortener/internal/model"
 	"github.com/Butters19/url-shortener/internal/storage"
 	"github.com/Butters19/url-shortener/internal/storage/memory"
 	"github.com/stretchr/testify/assert"
@@ -11,46 +13,52 @@ import (
 
 func TestSave_And_GetByCode(t *testing.T) {
 	s := memory.New()
+	ctx := context.Background()
 
-	err := s.Save("https://ozon.ru", "abc123")
+	err := s.Save(ctx, model.URL{Original: "https://ozon.ru", Code: "abc123defg"})
 	require.NoError(t, err)
 
-	url, err := s.GetByCode("abc123")
+	u, err := s.GetByCode(ctx, "abc123defg")
 	require.NoError(t, err)
-	assert.Equal(t, "https://ozon.ru", url)
+	assert.Equal(t, "https://ozon.ru", u.Original)
+	assert.Equal(t, "abc123defg", u.Code)
 }
 
-func TestSave_And_GetByURL(t *testing.T) {
+func TestSave_And_GetByOrigin(t *testing.T) {
 	s := memory.New()
+	ctx := context.Background()
 
-	err := s.Save("https://ozon.ru", "abc123")
+	err := s.Save(ctx, model.URL{Original: "https://ozon.ru", Code: "abc123defg"})
 	require.NoError(t, err)
 
-	code, err := s.GetByURL("https://ozon.ru")
+	u, err := s.GetByOrigin(ctx, "https://ozon.ru")
 	require.NoError(t, err)
-	assert.Equal(t, "abc123", code)
+	assert.Equal(t, "abc123defg", u.Code)
 }
 
 func TestSave_DuplicateURL_ReturnsError(t *testing.T) {
 	s := memory.New()
+	ctx := context.Background()
 
-	err := s.Save("https://ozon.ru", "abc123")
+	err := s.Save(ctx, model.URL{Original: "https://ozon.ru", Code: "abc123defg"})
 	require.NoError(t, err)
 
-	err = s.Save("https://ozon.ru", "xyz999")
+	err = s.Save(ctx, model.URL{Original: "https://ozon.ru", Code: "xyz999abcd"})
 	assert.ErrorIs(t, err, storage.ErrAlreadyExists)
 }
 
 func TestGetByCode_NotFound_ReturnsError(t *testing.T) {
 	s := memory.New()
+	ctx := context.Background()
 
-	_, err := s.GetByCode("notexist")
+	_, err := s.GetByCode(ctx, "notexist")
 	assert.ErrorIs(t, err, storage.ErrNotFound)
 }
 
-func TestGetByURL_NotFound_ReturnsError(t *testing.T) {
+func TestGetByOrigin_NotFound_ReturnsError(t *testing.T) {
 	s := memory.New()
+	ctx := context.Background()
 
-	_, err := s.GetByURL("https://notexist.com")
+	_, err := s.GetByOrigin(ctx, "https://notexist.com")
 	assert.ErrorIs(t, err, storage.ErrNotFound)
 }
